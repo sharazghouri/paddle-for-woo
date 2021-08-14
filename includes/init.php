@@ -14,9 +14,7 @@ class Init {
 	* @return array Full list of classes
 	*/
 	public static function get_services() {
-		return [
-			Classes\Enqueue::class,
-		];
+		return [];
 	}
 
 	/**
@@ -26,6 +24,12 @@ class Init {
 	 * @return
 	 */
 	public function __construct() {
+
+
+		if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ) ) ) {
+			return;
+	}
+
 		foreach ( self::get_services() as $class ) {
 			$service = self::instantiate( $class );
 			if ( method_exists( $service, 'register' ) ) {
