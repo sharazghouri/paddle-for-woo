@@ -51,10 +51,10 @@ function plugin_new_deactivate() {
 }
  register_activation_hook( __FILE__, 'plugin_new_deactivate' );
 
-
+ new \Pdfw\Init();
 // Adding the main file for the plugin.
-if ( file_exists( PADDLE_WOO_INC . 'init.php' ) ) {
-	require_once PADDLE_WOO_INC . 'init.php';
-}
+// if ( file_exists( PADDLE_WOO_INC . 'init.php' ) ) {
+// 	require_once PADDLE_WOO_INC . 'init.php';
+// }
 
 
