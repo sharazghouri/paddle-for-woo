@@ -130,16 +130,16 @@ class WC_Pdfw extends WC_Payment_Gateway {
 			exit;
 		} else {
 			// We got a response, but it was an error response
-			wc_add_notice( __( 'Something went wrong getting checkout url. Check if gateway is integrated.', 'pdfw' ), 'error' );
+			wc_add_notice( __( 'Something went wrong getting checkout url. Check if gateway is integrated.', 'pfwoo' ), 'error' );
 			if ( is_object( $api_response ) ) {
-				error_log( __( 'Paddle error. Error response from API. Method: ' . __METHOD__ . ' Errors: ', 'pdfw' ) . print_r( $api_response->error, true ) );
+				error_log( __( 'Paddle error. Error response from API. Method: ' . __METHOD__ . ' Errors: ', 'pfwoo' ) . print_r( $api_response->error, true ) );
 			} else {
-				error_log( __( 'Paddle error. Error response from API. Method: ' . __METHOD__ . ' Response: ', 'pdfw' ) . print_r( $response, true ) );
+				error_log( __( 'Paddle error. Error response from API. Method: ' . __METHOD__ . ' Response: ', 'pfwoo' ) . print_r( $response, true ) );
 			}
 			return json_encode(
 				array(
 					'result' => 'failure',
-					'errors' => __( 'Something went wrong. Check if Paddle account is properly integrated.', 'pdfw' ),
+					'errors' => __( 'Something went wrong. Check if Paddle account is properly integrated.', 'pfwoo' ),
 				)
 			);
 		}
@@ -176,7 +176,7 @@ class WC_Pdfw extends WC_Payment_Gateway {
 		if ( $api_response_public_key->success === true ) {
 
 			if ( empty( $public_key ) ) {
-							error_log( __( 'Paddle error. Unable to verify webhook callback - vendor_public_key is not set.', 'pdfw' ) );
+							error_log( __( 'Paddle error. Unable to verify webhook callback - vendor_public_key is not set.', 'pfwoo' ) );
 				return -1;
 			}
 
@@ -206,13 +206,13 @@ class WC_Pdfw extends WC_Payment_Gateway {
 						status_header( 200 );
 						exit;
 					} else {
-						error_log( __( 'Paddle error. Unable to complete payment - order ', 'pdfw' ) . $order_id . __( ' does not exist', 'pdfw' ) );
+						error_log( __( 'Paddle error. Unable to complete payment - order ', 'pfwoo' ) . $order_id . __( ' does not exist', 'pfwoo' ) );
 					}
 				} else {
-					error_log( __( 'Paddle error. Unable to complete payment - order_id is not integer. Got \'', 'pdfw' ) . $order_id . '\'.' );
+					error_log( __( 'Paddle error. Unable to complete payment - order_id is not integer. Got \'', 'pfwoo' ) . $order_id . '\'.' );
 				}
 			} else {
-				error_log( __( 'The signature is invalid!', 'pdfw' ) );
+				error_log( __( 'The signature is invalid!', 'pfwoo' ) );
 			}
 		}
 	}
