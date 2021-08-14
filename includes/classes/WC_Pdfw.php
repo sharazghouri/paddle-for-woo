@@ -5,7 +5,7 @@ class WC_Pdfw extends WC_Payment_Gateway {
 
 	/**
 	 * Class constructor exectue when object created.
-	 * 
+	 *
 	 * @since 1.0.0
 	 */
 	public function __construct() {
@@ -13,6 +13,7 @@ class WC_Pdfw extends WC_Payment_Gateway {
 		$this->method_title       = __( 'Paddle', 'pfwoo' );
 		$this->method_description = __( 'WooCommerce Payment Gateway for digital products.', 'pfwoo' );
 		$this->title              = __( 'Woo Paddle', 'pfwoo' );
+		$this->icon               = PADDLE_WOO_URL . '/assets/images/paddle.png';
 		$this->has_fields         = false;
 
 		$this->supports = array( 'products' );
@@ -31,17 +32,11 @@ class WC_Pdfw extends WC_Payment_Gateway {
 
 	/**
 	 * Paddle setting fields.
-	 * 
+	 *
 	 * @since 1.0.0
 	 * @return void
 	 */
 	public function init_form_fields() {
-		if ( $this->get_option( 'vendor_id' ) && $this->get_option( 'vendor_auth_code' ) ) {
-			$connection_button = '<p style=\'color:green\'>Your paddle account has already been connected</p>' .
-			'<a class=\'button-primary open_paddle_integration_window\'>' . esc_html__( 'Reconnect your Paddle Account', 'pfwoo' ) . '</a>';
-		} else {
-			$connection_button = '<a class=\'button-primary open_paddle_integration_window\'>' . esc_html__( 'Connect your Paddle Account', 'pfwoo' ) . '</a>';
-		}
 
 		$this->form_fields = array(
 
@@ -59,13 +54,6 @@ class WC_Pdfw extends WC_Payment_Gateway {
 				'default'     => esc_html__( 'Paddle', 'pfwoo' ),
 				'desc_tip'    => true,
 			),
-
-			'paddle_showlink'  => array(
-				'title'   => 'Vendor Account',
-				'content' => $connection_button . '<br /><p class = "description"><a href="#!" id=\'manualEntry\'>' . esc_html__( 'Click here to enter your account details manually', 'pfwoo' ) . '</a></p>',
-				'type'    => 'raw',
-			),
-
 			'vendor_id'        => array(
 				'title'       => esc_html__( 'Vendor ID', 'pfwoo' ),
 				'type'        => 'text',
@@ -84,5 +72,148 @@ class WC_Pdfw extends WC_Payment_Gateway {
 				'default'     => esc_html__( 'Pay using Visa, Mastercard, Maestro, American Express, Discover, Diners Club, JCB, UnionPay, Mada or PayPal via Paddle', 'pfwoo' ),
 			),
 		);
+	}
+
+	/**
+	 * Process the order payment.
+	 *
+	 * @uses Execute ajax_process_checkout
+	 * @since 1.0.0
+	 * @param int $order_id order id.
+	 * @return void
+	 */
+	public function process_payment( $order_id ) {
+
+		$order = new WC_Order( $order_id );
+
+		foreach ( $order->get_items() as $item ) {
+			$product_name[] = $item->get_name();
+			$product_id     = $item->get_product_id();
+		}
+
+		$response = wp_remote_retrieve_body(
+			wp_remote_post(
+				'https://vendors.paddle.com/api/2.0/product/generate_pay_link',
+				array(
+					'method'      => 'POST',
+					'timeout'     => 30,
+					'httpversion' => '1.1',
+					'body'        => array(
+						'vendor_id'        => $this->get_option( 'vendor_id' ),
+						'vendor_auth_code' => $this->get_option( 'vendor_auth_code' ),
+						'title'            => implode( ', ', $product_name ),
+						'image_url'        => wp_get_attachment_image_src( get_post_thumbnail_id( $product_id ), array( '220', '220' ), true )[0],
+						'prices'           => array( get_woocommerce_currency() . ':' . $order->get_total() ),
+						'customer_email'   => $order->get_billing_email(),
+						'return_url'       => $order->get_checkout_order_received_url(),
+						'webhook_url'      => get_bloginfo( 'url' ) . '/wc-api/' . $this->id . '?order_id=' . $order_id,
+
+					),
+				)
+			)
+		);
+
+		$api_response = json_decode( $response );
+		wc_add_notice( json_decode( get_bloginfo( 'url' ) . '/wc-api/' . $this->id . '?order_id=' . $order_id ) );
+
+		if ( $api_response && $api_response->success === true ) {
+			// We got a valid response
+			echo json_encode(
+				array(
+					'result'       => 'success',
+					'order_id'     => $order->get_id(),
+					'checkout_url' => $api_response->response->url,
+					'email'        => $order->get_billing_email(),
+				)
+			);
+			// Exit is important
+			exit;
+		} else {
+			// We got a response, but it was an error response
+			wc_add_notice( __( 'Something went wrong getting checkout url. Check if gateway is integrated.', 'pdfw' ), 'error' );
+			if ( is_object( $api_response ) ) {
+				error_log( __( 'Paddle error. Error response from API. Method: ' . __METHOD__ . ' Errors: ', 'pdfw' ) . print_r( $api_response->error, true ) );
+			} else {
+				error_log( __( 'Paddle error. Error response from API. Method: ' . __METHOD__ . ' Response: ', 'pdfw' ) . print_r( $response, true ) );
+			}
+			return json_encode(
+				array(
+					'result' => 'failure',
+					'errors' => __( 'Something went wrong. Check if Paddle account is properly integrated.', 'pdfw' ),
+				)
+			);
+		}
+	}
+
+
+	/**
+	 * Callback webhook after payment process complete.
+	 *
+	 * @uses "https://localhost.com/wc-api/woo_paddle?order_id=xx"
+	 * @since 1.0.0
+	 * @return void
+	 */
+	public function webhook_response() {
+
+		$public_key_response = wp_remote_retrieve_body(
+			wp_remote_post(
+				'https://vendors.paddle.com/api/2.0/user/get_public_key',
+				array(
+					'method'      => 'POST',
+					'timeout'     => 30,
+					'httpversion' => '1.1',
+					'body'        => array(
+						'vendor_id'        => $this->get_option( 'vendor_id' ),
+						'vendor_auth_code' => $this->get_option( 'vendor_auth_code' ),
+					),
+				)
+			)
+		);
+
+		$api_response_public_key = json_decode( $public_key_response );
+		$public_key              = $api_response_public_key->response->public_key;
+
+		if ( $api_response_public_key->success === true ) {
+
+			if ( empty( $public_key ) ) {
+							error_log( __( 'Paddle error. Unable to verify webhook callback - vendor_public_key is not set.', 'pdfw' ) );
+				return -1;
+			}
+
+			// Copy get input to separate variable to not modify superglobal array
+			$webhook_data = $_POST;
+			foreach ( $webhook_data as $k => $v ) {
+				$webhook_data[ $k ] = stripslashes( $v );
+			}
+
+			// Pop signature from webhook data
+			$signature = base64_decode( $webhook_data['p_signature'] );
+			unset( $webhook_data['p_signature'] );
+
+			// Check signature and return result
+			ksort( $webhook_data );
+			$data = serialize( $webhook_data );
+
+			// Verify the signature
+			$verification = openssl_verify( $data, $signature, $public_key, OPENSSL_ALGO_SHA1 );
+
+			if ( $verification == 1 ) {
+				$order_id = sanitize_text_field( $_GET['order_id'] );
+				if ( is_numeric( $order_id ) && (int) $order_id == $order_id ) {
+					$order = new WC_Order( $order_id );
+					if ( is_object( $order ) && $order instanceof WC_Order ) {
+						$order->payment_complete();
+						status_header( 200 );
+						exit;
+					} else {
+						error_log( __( 'Paddle error. Unable to complete payment - order ', 'pdfw' ) . $order_id . __( ' does not exist', 'pdfw' ) );
+					}
+				} else {
+					error_log( __( 'Paddle error. Unable to complete payment - order_id is not integer. Got \'', 'pdfw' ) . $order_id . '\'.' );
+				}
+			} else {
+				error_log( __( 'The signature is invalid!', 'pdfw' ) );
+			}
+		}
 	}
 }
