@@ -40,13 +40,6 @@ class WC_Pdfw extends WC_Payment_Gateway {
 
 		$this->form_fields = array(
 
-			'enabled'          => array(
-				'title'   => esc_html__( 'Enable/Disable', 'pfwoo' ),
-				'type'    => 'checkbox',
-				'label'   => esc_html__( 'Enable', 'pfwoo' ),
-				'default' => 'yes',
-			),
-
 			'title'            => array(
 				'title'       => esc_html__( 'Title', 'pfwoo' ),
 				'type'        => 'text',
